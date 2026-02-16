@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Chess.com Game Review System</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 2rem; background: #0f172a; color: #e2e8f0; }
+    .wrap { max-width: 960px; margin: 0 auto; }
+    textarea,input,button { width: 100%; margin: .5rem 0; padding: .75rem; border-radius: 8px; border: 1px solid #334155; background:#1e293b;color:#e2e8f0; }
+    button { background:#2563eb; border:none; font-weight:bold; cursor:pointer; }
+    .grid { display:grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    .card { background:#1e293b; border-radius: 10px; padding: 1rem; }
+    table { width: 100%; border-collapse: collapse; margin-top:1rem; }
+    th, td { border-bottom:1px solid #334155; padding:.4rem; text-align:left; font-size:.9rem; }
+    .blunder { color: #ef4444; font-weight:bold; }
+    .mistake { color: #f97316; font-weight:bold; }
+    .inaccuracy { color: #eab308; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>♟️ Chess.com Game Review System</h1>
+    <p>Paste PGN, provide a chess.com game URL, or use a username to review latest game.</p>
+
+    <div class="grid">
+      <div class="card">
+        <h3>PGN Input</h3>
+        <textarea id="pgn" rows="12" placeholder="Paste PGN here..."></textarea>
+      </div>
+      <div class="card">
+        <h3>Alternative Inputs</h3>
+        <input id="url" placeholder="https://www.chess.com/game/live/..." />
+        <input id="username" placeholder="chess.com username" />
+        <button id="reviewBtn">Run Review</button>
+      </div>
+    </div>
+
+    <div id="result"></div>
+  </div>
+
+<script>
+const resultEl = document.getElementById('result');
+
+document.getElementById('reviewBtn').addEventListener('click', async () => {
+  resultEl.innerHTML = '<p>Reviewing game...</p>';
+  const pgn = document.getElementById('pgn').value.trim();
+  const game_url = document.getElementById('url').value.trim();
+  const username = document.getElementById('username').value.trim();
+
+  const payload = {};
+  if (pgn) payload.pgn = pgn;
+  if (game_url) payload.game_url = game_url;
+  if (username) payload.username = username;
+
+  try {
+    const resp = await fetch('/api/review', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload),
+    });
+    const data = await resp.json();
+    if (!resp.ok) {
+      throw new Error(data.detail || 'Unknown API error');
+    }
+
+    const rows = data.moves.map(m => `
+      <tr>
+        <td>${m.ply}</td>
+        <td>${m.side}</td>
+        <td>${m.san}</td>
+        <td>${m.eval_before}</td>
+        <td>${m.eval_after}</td>
+        <td>${m.loss}</td>
+        <td class="${m.category}">${m.category}</td>
+      </tr>`).join('');
+
+    resultEl.innerHTML = `
+      <div class="grid" style="margin-top:1rem;">
+        <div class="card"><h3>White Accuracy</h3><p>${data.white_accuracy}%</p></div>
+        <div class="card"><h3>Black Accuracy</h3><p>${data.black_accuracy}%</p></div>
+      </div>
+      <div class="card" style="margin-top:1rem;">
+        <h3>Move-by-Move Review</h3>
+        <table>
+          <thead><tr><th>Ply</th><th>Side</th><th>Move</th><th>Eval Before</th><th>Eval After</th><th>Loss</th><th>Category</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+  } catch (e) {
+    resultEl.innerHTML = `<p style="color:#f87171">Error: ${e.message}</p>`;
+  }
+});
+</script>
+</body>
+</html>
